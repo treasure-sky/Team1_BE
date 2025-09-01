@@ -17,12 +17,24 @@ jobs:
       ECS_SERVICE: boost-ecs-task-family-service
       ECS_TASK_FAMILY: boost-ecs-task-family
       CONTAINER_NAME: ecs-spring
-      ALB_HEALTHCHECK_URL: boost-alb-1093896118.ap-northeast-2.elb.amazonaws.com/health
+      ALB_HEALTHCHECK_URL: http://boost-alb-1093896118.ap-northeast-2.elb.amazonaws.com/health
       IMAGE_TAG: ${{ github.sha }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Build JAR (Gradle)
+        run: |
+          set -e
+          chmod +x ./gradlew
+          ./gradlew clean bootJar -x test
 
       # 1) AWS 자격증명 (Secret에서만 가져옴)
       - name: Configure AWS Credentials
