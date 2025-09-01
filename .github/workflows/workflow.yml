@@ -18,7 +18,7 @@ jobs:
       ECS_TASK_FAMILY: boost-ecs-task-family
       CONTAINER_NAME: ecs-spring
       ALB_HEALTHCHECK_URL: http://boost-alb-1093896118.ap-northeast-2.elb.amazonaws.com/health
-      IMAGE_TAG: ${{ github.sha }}
+      IMAGE_TAG: spring
 
     steps:
       - name: Checkout
