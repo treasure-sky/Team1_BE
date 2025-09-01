@@ -2,7 +2,7 @@ name: Deploy to ECS (hardcoded except AWS keys)
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "develop" ]
   workflow_dispatch: {}
 
 jobs:
