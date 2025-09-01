@@ -1,0 +1,115 @@
+name: Deploy to ECS (hardcoded except AWS keys)
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch: {}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    env:
+      AWS_REGION: ap-northeast-2
+      AWS_ACCOUNT_ID: 994523636482
+      ECR_REPOSITORY: boost-ecr
+      ECS_CLUSTER: boost-ecs
+      ECS_SERVICE: boost-ecs-task-family-service
+      ECS_TASK_FAMILY: boost-ecs-task-family
+      CONTAINER_NAME: ecs-spring
+      ALB_HEALTHCHECK_URL: boost-alb-1093896118.ap-northeast-2.elb.amazonaws.com/health
+      IMAGE_TAG: ${{ github.sha }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 1) AWS 자격증명 (Secret에서만 가져옴)
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # 2) ECR 로그인
+      - name: Login to Amazon ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # 3) Docker Build & Push
+      - name: Build & Push Docker Image
+        run: |
+          set -e
+          REGISTRY="${{ steps.ecr.outputs.registry }}"
+          IMAGE_URI="${REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}"
+
+          echo "Building $IMAGE_URI"
+          docker build -t "$IMAGE_URI" .
+
+          echo "Pushing $IMAGE_URI"
+          docker push "$IMAGE_URI"
+
+          echo "IMAGE_URI=$IMAGE_URI" >> $GITHUB_ENV
+
+      # 4) 태스크정의의 이미지 교체 → 새 태스크정의 등록
+      - name: Render & Register new task definition
+        run: |
+          set -e
+          aws ecs describe-task-definition \
+            --task-definition "${ECS_TASK_FAMILY}" \
+            --query 'taskDefinition' > td.json
+
+          NEW_TD=$(jq --arg IMG "$IMAGE_URI" --arg NAME "$CONTAINER_NAME" '
+            .containerDefinitions |= map(
+              if .name == $NAME then .image = $IMG else . end
+            )
+            | del(.taskDefinitionArn, .revision, .status, .requiresAttributes,
+                  .compatibilities, .registeredAt, .registeredBy)
+          ' td.json)
+
+          echo "$NEW_TD" > new-td.json
+
+          TASK_DEF_ARN=$(aws ecs register-task-definition \
+            --cli-input-json file://new-td.json \
+            --query 'taskDefinition.taskDefinitionArn' \
+            --output text)
+
+          echo "TASK_DEF_ARN=$TASK_DEF_ARN" >> $GITHUB_ENV
+          echo "New task definition: $TASK_DEF_ARN"
+
+      # 5) 서비스 업데이트 & 안정화 대기
+      - name: Update ECS Service
+        run: |
+          set -e
+          aws ecs update-service \
+            --cluster "$ECS_CLUSTER" \
+            --service "$ECS_SERVICE" \
+            --task-definition "$TASK_DEF_ARN" \
+            --force-new-deployment >/dev/null
+
+      - name: Wait for service stable
+        run: |
+          set -e
+          aws ecs wait services-stable \
+            --cluster "$ECS_CLUSTER" \
+            --services "$ECS_SERVICE"
+
+      # 6) 스모크 테스트 (/health)
+      - name: Smoke Test via ALB
+        run: |
+          set -e
+          echo "Smoke testing: ${ALB_HEALTHCHECK_URL}"
+
+          for i in $(seq 1 20); do
+            CODE=$(curl -s -o /dev/null -w "%{http_code}" "${ALB_HEALTHCHECK_URL}")
+            echo "Attempt $i -> HTTP $CODE"
+            if [ "$CODE" = "200" ] || [ "$CODE" = "204" ]; then
+              echo "✅ Health check passed"
+              exit 0
+            fi
+            sleep 5
+          done
+
+          echo "❌ Health check failed"
+          exit 1
