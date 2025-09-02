@@ -13,4 +13,9 @@ public class HealthCheckController {
         return ResponseEntity.ok(Map.of("status", "OK"));
     }
 
+    @GetMapping("/hi")
+    public ResponseEntity<Map<String, String>> hi() {
+        return ResponseEntity.ok(Map.of("hi", "kk"));
+    }
+
 }
