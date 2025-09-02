@@ -4,7 +4,7 @@
   "requiresCompatibilities": ["EC2"],
   "cpu": "512",
   "memory": "768",
-  "executionRoleArn": "arn:aws:iam::994523636482:role/ecsTaskExecutionRole",
+  "executionRoleArn": "arn:aws:iam::994523636482:role/ecsTaskExecutionRole-jh",
   "containerDefinitions": [
     {
       "name": "app",
