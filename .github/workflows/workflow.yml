@@ -89,4 +89,3 @@ jobs:
             sleep 10
           done
           echo "Timeout waiting for healthy target"; exit 1
-
