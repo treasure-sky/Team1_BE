@@ -82,7 +82,7 @@ jobs:
       - name: Wait until TG has 1 healthy target (<= 2 min)
         env:
           TG_NAME: ${{ vars.TG_NAME }}
-          AWS_REGION: ${{ secrets.AWS_REGION }}
+          AWS_REGION: ${{ vars.AWS_REGION }}
         run: |
           TG_ARN=$(aws elbv2 describe-target-groups \
             --region "$AWS_REGION" \
