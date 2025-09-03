@@ -2,8 +2,7 @@
   "family": "boost-task-jh",
   "networkMode": "awsvpc",
   "requiresCompatibilities": ["EC2"],
-  "cpu": "512",
-  "memory": "768",
+  "cpu": "1024",
   "executionRoleArn": "arn:aws:iam::994523636482:role/ecsTaskExecutionRole-jh",
   "containerDefinitions": [
     {
@@ -21,9 +20,14 @@
           "awslogs-stream-prefix": "ecs"
         }
       },
+      "environment": [
+        {
+          "name": "JAVA_TOOL_OPTIONS",
+          "value": "-XX:MaxRAMPercentage=70 -XX:+UseSerialGC -XX:+ExitOnOutOfMemoryError"
+        }
+      ],
       "memoryReservation": 512,
       "memory": 768
     }
   ]
 }
-
