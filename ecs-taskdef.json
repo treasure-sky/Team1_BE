@@ -27,7 +27,8 @@
         }
       ],
       "memoryReservation": 512,
-      "memory": 768
+      "memory": 768,
+      "stopTimeout": 10
     }
   ]
 }
