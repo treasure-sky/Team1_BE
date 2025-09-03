@@ -51,9 +51,6 @@ jobs:
           role-session-name: gha-${{ github.run_id }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: WhoAmI (debug)
-        run: aws sts get-caller-identity
-
       - name: Login to Amazon ECR
         uses: aws-actions/amazon-ecr-login@v2
 
@@ -79,31 +76,11 @@ jobs:
           cluster: ${{ env.ECS_CLUSTER }}
           wait-for-service-stability: false
 
-      - name: Wait until TG has 1 healthy target (<= 2 min)
-        env:
-          TG_NAME: ${{ vars.TG_NAME }}
-          AWS_REGION: ${{ vars.AWS_REGION }}
+      - name: Wait for ECS service to stabilize
         run: |
-          TG_ARN=$(aws elbv2 describe-target-groups \
-            --region "$AWS_REGION" \
-            --names "$TG_NAME" \
-            --query 'TargetGroups[0].TargetGroupArn' \
-            --output text)
-
-          for i in {1..12}; do
-            H=$(aws elbv2 describe-target-health \
-              --region "$AWS_REGION" \
-              --target-group-arn "$TG_ARN" \
-              --query 'length(TargetHealthDescriptions[?TargetHealth.State==`healthy`])' \
-              --output text)
-
-            echo "[$i] Healthy targets: $H"
-            if [ "$H" -ge 1 ]; then
-              echo "Healthy target ready"
-              exit 0
-            fi
-            sleep 10
-          done
-
-          echo "Timeout waiting for healthy target"
-          exit 1
+          echo "Waiting for ECS service $ECS_SERVICE in cluster $ECS_CLUSTER..."
+          aws ecs wait services-stable \
+            --cluster "$ECS_CLUSTER" \
+            --services "$ECS_SERVICE" \
+            --region "$AWS_REGION"
+          echo "ECS service is stable"
